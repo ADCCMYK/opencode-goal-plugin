@@ -223,7 +223,7 @@ opencode-goal-plugin/
 ├─ goal-config.tsx         TUI 插件源码（deploy 复制到 tui-plugin/）
 ├─ agents/z-goal.md        z-goal 主代理提示词
 ├─ config.default.json     运行配置初始模板
-├─ deploy.sh / backup.sh   部署 / 备份（备份自动脱敏密钥）
+├─ deploy.sh               部署插件相关配置
 └─ package.json            npm run build = esbuild 打包
 ```
 
