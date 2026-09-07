@@ -57,12 +57,6 @@ bash deploy.sh
 
 配置会在首次部署时初始化到 `~/.local/state/goal/config.json`（已存在则保留不动，用 `/goal-config` 或直接编辑）。
 
-备份一键打包（含密钥自动脱敏）：
-
-```bash
-bash backup.sh        # 输出：目录结构 zip（如 opencode-goal-backup.zip）
-```
-
 ---
 
 ## 快速开始
@@ -74,10 +68,10 @@ bash backup.sh        # 输出：目录结构 zip（如 opencode-goal-backup.zip
 设置后即可放手。插件自动完成：
 
 ```
-第 1 轮   探索：确认完成条件（读代码/搜索/验证）→ flow=plan
-第 2 轮   规划：写方案文档 + update_stages 规划阶段（带各阶段代办）→ flow=execute
-第 3+ 轮  执行：逐阶段推进，todos/stage 流转，子代理并行干活
-最后      审计：audit 提交 → 二次审计确认 → 目标清理/保留
+第 1 轮  探索：确认完成条件（读代码/搜索/验证）→ flow=plan
+第 1 轮  规划：写方案文档 + update_stages 规划阶段（带各阶段代办）→ flow=execute
+第 1 轮  执行：逐阶段推进，todos/stage 流转，子代理并行干活
+第 1 轮  审计：audit 提交 → 二次审计确认 → 目标清理/保留
 ```
 
 期间您随时可以：
