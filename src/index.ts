@@ -769,7 +769,7 @@ const GoalPlugin: Plugin = async ({ client }, options: PluginOptions = {}) => {
     tool: {
       goal: tool({
         description:
-          "目标推进管理（Qoder /goal 风格，按会话隔离）：每个会话独立目标，支持阶段与代办。设置后插件每轮自动发送「目标+阶段总览+代办」直到完成、暂停或达轮数上限。" +
+          "目标推进管理（ /goal 风格，按会话隔离）：每个会话独立目标，支持阶段与代办。设置后插件每轮自动发送「目标+阶段总览+代办」直到完成、暂停或达轮数上限。" +
           "调用时机：用户要求持续工作直到完成/修到全绿/持续推进时先 set；**流程切换用 flow（explore→plan→execute→audit，探索/规划中发现信息不足可回 explore）**；阶段流转用 stage；阶段整体修改用 update_stages；**当前阶段代办用 todos**；**全部工作完成并审计通过后，最后一步必须调用 audit 结束推进**；暂停、恢复、查看进度、取消分别对应 pause/resume/status/clear；手动清理已完成/已失败子代理会话用 cleanup（不受清理天数限制）。" +
           "迭代模式（config iterateMode 开启）：audit 后不删目标，插件在本轮结束后推送【迭代继续】指令（goal 工具 action=iterate 继续下一轮 / finish 结束收尾）。",
         args: {
