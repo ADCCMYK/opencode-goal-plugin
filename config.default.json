@@ -1,0 +1,13 @@
+{
+  "maxTurns": 100,
+  "cleanupDays": 3,
+  "autoApprovePermissions": true,
+  "maxRetainedSubagents": 60,
+  "forkPaused": true,
+  "iterateMode": false,
+  "iterateMaxRounds": 10,
+  "iterAskMode": "first",
+  "auditDelete": true,
+  "stuckTimeoutMs": 900000,
+  "pushIntervalMs": 600000
+}

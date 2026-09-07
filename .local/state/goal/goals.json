@@ -1,0 +1,152 @@
+{
+  "ses_02057173affe7wL6M3HElINAFz": {
+    "goal": "渗透、应急大重构与对应BOT重新特化：参考DC/红日靶场设计（真实软件与真实漏洞形态、多用户多凭据多入口、渐进链关卡化、真实高频提权），不照抄而落到平台约束内（容器隔离、无害教学桩、自动判分）；渗透场景覆盖 linux 纯场景、win 纯场景、win+linux 混合三类（win 用 dockurr 真 Windows，最多同时 2 台、管理员后台可设）；应急按真实事件场景扩充（挖矿/webshell/SSH爆破后门/持久化隐藏等，win 事件日志类）；BOT 按新场景重新特化（探索解锁平台真实利用链，只限BOT不限制选手）；红线仅三条：容器隔离不出外网虚拟机、无真实病毒与勒索病毒、其余手法不限；AWD 零改动（回归守护）",
+    "state": "active",
+    "turns": 58,
+    "maxTurns": 100,
+    "updatedAt": 1788787603859,
+    "startedAt": 1788711499495,
+    "stages": [
+      {
+        "id": "r1",
+        "name": "环境恢复与部署保障（docker 故障修复+服务器部署无问题）",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "出题 MCP 权限（stage2 判定+全入口 403+测试，部署验证）",
+            "status": "completed"
+          },
+          {
+            "content": "10.0.x 网段（局网/题库/痕迹/win 10.0.6+白名单核对，测试+部署）",
+            "status": "completed"
+          },
+          {
+            "content": "体验E1：pen/inc BOT UI（两端）",
+            "status": "completed"
+          },
+          {
+            "content": "体验E4：题干去提示化（两端）",
+            "status": "completed"
+          },
+          {
+            "content": "体验E5：学习卡 185/221（两端）",
+            "status": "completed"
+          },
+          {
+            "content": "体验E6：tab 导航居中+间距+hover 主题色（两端）",
+            "status": "completed"
+          },
+          {
+            "content": "体验E2：CH-1043 干扰项示范完成；全库取证类批量治理转 r2 取证真实化统一推进",
+            "status": "completed"
+          },
+          {
+            "content": "体验E3：红线收敛（R 层+表述改写+测试）",
+            "status": "completed"
+          },
+          {
+            "content": "主题三值精确+刷新首帧同步+按钮当前名（两端）",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "name": "第一届样题核对+取证题真实化（流量制作）",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "第一届样题全量核对表",
+            "status": "completed"
+          },
+          {
+            "content": "B14 综合取证大题：素材真实制作+16 题入库（CH-1254~1269 两端）",
+            "status": "completed"
+          },
+          {
+            "content": "12 pcap 真实重打全完成（10.0 网段+answers 零变更/谨慎同步+旧件备份）",
+            "status": "completed"
+          },
+          {
+            "content": "产物登记+判分自检（审核通过+DB↔manifest 全量同步+备份）",
+            "status": "completed"
+          },
+          {
+            "content": "全库取证题真实化批量（E2 现象级持续项：CH-1043 示范完成；其余取证素材题逐题丰富干扰=登记后续优化队列）",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "p3",
+        "name": "win/win+linux 场景落地",
+        "status": "pending",
+        "todos": [
+          {
+            "content": "win 纯场景（dockurr≤2）：关卡/训练形态+利用链装配",
+            "status": "pending"
+          },
+          {
+            "content": "win+linux 混合：拓扑+横向链（跨系统）",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "p4",
+        "name": "应急场景扩充落地",
+        "status": "pending",
+        "todos": [
+          {
+            "content": "真实事件剧本：SSH爆破+公钥后门/隐藏持久化/chattr锁/启动项等",
+            "status": "pending"
+          },
+          {
+            "content": "win 应急（事件日志 4624/4625/4720/7045 等）形态",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "p5",
+        "name": "BOT 重新特化+验证矩阵",
+        "status": "in_progress",
+        "todos": [
+          {
+            "content": "BOT 速度按档位调整（信息驱动+链逐条节流+测试档短间隔接口带管理员 token 已有=验证）",
+            "status": "in_progress"
+          },
+          {
+            "content": "sqli_blind_time 卡补完整外带循环；ssh_reuse 升级第 4 多账号（advanced 40%）",
+            "status": "in_progress"
+          },
+          {
+            "content": "persist 应急新场景 BOT 特化（inc_bot 知识链）+全自动验证",
+            "status": "pending"
+          },
+          {
+            "content": "验证矩阵：pen 随机局全链实测+应急矩阵+AWD 回归零影响",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "p6",
+        "name": "收尾",
+        "status": "pending",
+        "todos": [
+          {
+            "content": "pytest 全子集+DEV-NOTES+备份",
+            "status": "pending"
+          },
+          {
+            "content": "audit",
+            "status": "pending"
+          }
+        ]
+      }
+    ],
+    "planFile": "/tmp/plan/ses_02057173affe7wL6M3HElINAFz-1788711499495.md",
+    "flow": "execute"
+  }
+}

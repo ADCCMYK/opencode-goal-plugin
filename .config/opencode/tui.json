@@ -1,0 +1,3 @@
+{
+  "plugin": ["./tui-plugin/goal-config.tsx"]
+}

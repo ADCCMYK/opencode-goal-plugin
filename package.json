@@ -1,0 +1,31 @@
+{
+  "name": "opencode-goal-plugin",
+  "version": "1.0.0",
+  "description": "Qoder /goal 风格目标推进插件：设置目标后每轮自动继续推进直到完成、暂停或达轮数上限",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    "./server": {
+      "import": "./dist/index.js",
+      "config": {
+        "maxTurns": 100
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --external:@opencode-ai/plugin --platform=node --format=esm --outfile=dist/index.js"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "goal",
+    "autonomous"
+  ],
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.18.15",
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "question": "allow"
+  },
+  "agent": {
+    "general": {
+      "mode": "subagent",
+      "permission": {
+        "question": "deny"
+      }
+    },
+    "explore": {
+      "mode": "subagent",
+      "permission": {
+        "question": "deny"
+      },
+      "tools": {
+        "goal": true
+      }
+    },
+    "scout": {
+      "mode": "subagent",
+      "permission": {
+        "question": "deny"
+      }
+    }
+  },
+  "plugin": [
+    [
+      "/root/opencode-goal-plugin/dist/index.js",
+      {
+        "maxTurns": 100,
+        "stuckTimeoutMs": 600000,
+        "autoAbortSubagent": true,
+        "cleanupDays": 3,
+        "maxRetainedSubagents": 60
+      }
+    ]
+  ],
+  "command": {
+    "goal": {
+      "template": "/goal $ARGUMENTS",
+      "agent": "z-goal",
+      "description": "设置目标并持续自主推进直到完成",
+      "subtask": false
+    },
+    "goal-iter": {
+      "template": "/goal-iter $ARGUMENTS",
+      "agent": "z-goal",
+      "description": "设置目标并临时开启一次迭代模式",
+      "subtask": false
+    }
+  }
+}
