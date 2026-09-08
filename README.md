@@ -1,4 +1,4 @@
-# opencode-goal-plugin 
+# opencode-goal-plugin
 
 **目标持续推进插件**：为 [opencode](https://opencode.ai) 提供  `/goal` 风格的目标驱动自主工作流——给 AI 设一个目标，插件自动持续推进，直到完成、暂停或达到轮数上限，无需用户每轮催促。
 
