@@ -340,7 +340,7 @@ const GoalPlugin: Plugin = async ({ client }, options: PluginOptions = {}) => {
       // H2：lastAsst undefined = 尚无任何真实 AI 完成消息（只有插件 synthetic 推送）→ 不推进（防 turns 注水/重复推送）
       const lastMsgId = lastAsst?.id ?? lastAsst?.info?.id
       if (lastPushedMsg.get(sessionID) === lastMsgId) return
-      const turns = entry.turns + 1
+      const turns = entry.turns + (via === "idle" ? 1 : 0)
       entry.turns = turns
       entry.updatedAt = Date.now()
       // 迭代模式不设内部推进轮次上限（仅受 iterateMaxRounds 迭代轮数限制）；正常目标模式保持 maxTurns 限制；子代理永远正常模式（不受 config iterateMode 影响）
