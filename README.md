@@ -1,12 +1,12 @@
 # opencode-goal-plugin
 
-**目标持续推进插件**：为 [opencode](https://opencode.ai) 提供  `/goal` 风格的目标驱动自主工作流——给 AI 设一个目标，插件自动持续推进，直到完成、暂停或达到轮数上限，无需用户每轮催促。
+**目标持续推进插件**：为 [opencode](https://opencode.ai) 提供 Qoder `/goal` 风格的目标驱动自主工作流——给 AI 设一个目标，插件自动持续推进，直到完成、暂停或达到轮数上限，无需用户每轮催促。
 
 > 面向**长时间自主任务**（如"实现 XX 功能，修到全绿，不完成不停止"）。由「z-goal 总规划师」主代理 + 事件驱动自动推送 + 阶段/代办双轨管理 + 多 Agent 并行调度构成完整闭环。
 
 ---
 
-## 为什么需要
+## 为什么需要它
 
 普通会话中，AI 每完成一个回合就停下来等用户发话；做大型任务时用户必须反复输入"继续"。本插件把"持续推进"变成系统能力：
 
@@ -223,7 +223,7 @@ opencode-goal-plugin/
 ├─ goal-config.tsx         TUI 插件源码（deploy 复制到 tui-plugin/）
 ├─ agents/z-goal.md        z-goal 主代理提示词
 ├─ config.default.json     运行配置初始模板
-├─ deploy.sh               部署插件相关配置
+├─ deploy.sh / backup.sh   部署 / 备份（备份自动脱敏密钥）
 └─ package.json            npm run build = esbuild 打包
 ```
 

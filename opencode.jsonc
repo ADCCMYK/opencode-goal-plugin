@@ -26,6 +26,43 @@
       }
     }
   },
+  "provider": {
+    "deepseek-beta": {
+      "name": "DeepSeek Beta",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "REDACTED"
+      },
+      "models": {
+        "deepseek-v4.1-flash-expires-on-0910": {
+          "reasoning": true,
+          "tool_call": true,
+          "variants": {
+            "none": {
+              "reasoning": false
+            },
+            "medium": {
+              "disabled": true
+            },
+            "low": {
+              "reasoningEffort": "low"
+            },
+            "high": {
+              "reasoningEffort": "high"
+            },
+            "max": {
+              "reasoningEffort": "max"
+            }
+          },
+          "limit": {
+            "context": 1000000,
+            "output": 384000
+          }
+        }
+      }
+    }
+  },
   "plugin": [
     [
       "/root/opencode-goal-plugin/dist/index.js",

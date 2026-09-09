@@ -327,7 +327,7 @@ ${buildSnap(e).join("\n")}`;
       }
       const lastMsgId = lastAsst?.id ?? lastAsst?.info?.id;
       if (lastPushedMsg.get(sessionID) === lastMsgId) return;
-      const turns = entry.turns + 1;
+      const turns = entry.turns + (via === "idle" ? 1 : 0);
       entry.turns = turns;
       entry.updatedAt = Date.now();
       const isIterGoal = configIterateMode() && isSubagentCache.get(sessionID) !== true || !!entry.iteration;

@@ -1,7 +1,7 @@
 {
   "name": "opencode-goal-plugin",
   "version": "1.0.0",
-  "description": " /goal 风格目标推进插件：设置目标后每轮自动继续推进直到完成、暂停或达轮数上限",
+  "description": "Qoder /goal 风格目标推进插件：设置目标后每轮自动继续推进直到完成、暂停或达轮数上限",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {

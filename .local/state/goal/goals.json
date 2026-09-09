@@ -1,152 +1,405 @@
 {
   "ses_02057173affe7wL6M3HElINAFz": {
-    "goal": "渗透、应急大重构与对应BOT重新特化：参考DC/红日靶场设计（真实软件与真实漏洞形态、多用户多凭据多入口、渐进链关卡化、真实高频提权），不照抄而落到平台约束内（容器隔离、无害教学桩、自动判分）；渗透场景覆盖 linux 纯场景、win 纯场景、win+linux 混合三类（win 用 dockurr 真 Windows，最多同时 2 台、管理员后台可设）；应急按真实事件场景扩充（挖矿/webshell/SSH爆破后门/持久化隐藏等，win 事件日志类）；BOT 按新场景重新特化（探索解锁平台真实利用链，只限BOT不限制选手）；红线仅三条：容器隔离不出外网虚拟机、无真实病毒与勒索病毒、其余手法不限；AWD 零改动（回归守护）",
+    "goal": "wangan-arena 题库容器化与双OS加固改造（2026-09-08 用户逐项核对定稿）：①平台改造=同题号双靶机（CentOS7/Ubuntu 切换启动按钮）+双OS答案合并列表+题目显式 flag 路径支持；②全库\"需要环境\"的题一律容器化（先出缺口清单给用户审核，按清单补齐）；③OS 规则=原题明确环境只提供该环境容器、未明确则提供 CentOS7+Ubuntu 双版本；取证默认文件分析（附件），仅原题要求进靶机/现场分析才容器化；④提示卡可给答案命令（兜底可解性）、学习卡精炼去长篇、题干泄底收敛不得导致题目不可解；⑤win 基线重装中文并同步中文化 win 题（题干/评分标准/截图）；⑥遗留项全清=L1泄底/L2 pcap重打/L3服务器镜像固化/L4 winlab收尾/L5 E2取证素材/L6补卡+MCP/L7 inc治理/L8 win进阶/L9 C模块多机/L10 BOT速度/L11杂项；⑦验收=全量 pytest 全绿+每道新改题真机实证（双OS各一遍）+服务器 103.40.14.100 镜像固化同步实启验证。",
     "state": "active",
-    "turns": 58,
+    "turns": 94,
     "maxTurns": 100,
-    "updatedAt": 1788787603859,
-    "startedAt": 1788711499495,
+    "updatedAt": 1788908758397,
+    "startedAt": 1788871526009,
     "stages": [
       {
-        "id": "r1",
-        "name": "环境恢复与部署保障（docker 故障修复+服务器部署无问题）",
+        "id": "s1",
+        "name": "平台改造：双OS双靶机+切换启动按钮+答案合并+显式flag路径",
         "status": "completed",
         "todos": [
           {
-            "content": "出题 MCP 权限（stage2 判定+全入口 403+测试，部署验证）",
+            "content": "探明现有靶机链路（targets.py/target_manager/models/ChallengeDetail 启靶卡）",
             "status": "completed"
           },
           {
-            "content": "10.0.x 网段（局网/题库/痕迹/win 10.0.6+白名单核对，测试+部署）",
+            "content": "模型加 target_image_alt/target_os_label(_alt)/targetinstance.image_used + 幂等补列",
             "status": "completed"
           },
           {
-            "content": "体验E1：pen/inc BOT UI（两端）",
+            "content": "target_manager：动态flag注入（平台生成随机32hex+WA_*env，快照直存）+显式路径读取+image_override",
             "status": "completed"
           },
           {
-            "content": "体验E4：题干去提示化（两端）",
+            "content": "API start/reset 支持 os 选择 + GET 返回 available_os/image_used/os_label",
             "status": "completed"
           },
           {
-            "content": "体验E5：学习卡 185/221（两端）",
+            "content": "前端启靶卡 OS 选择/切换 + 当前 OS 标注（子agent完成，build 通过）",
             "status": "completed"
           },
           {
-            "content": "体验E6：tab 导航居中+间距+hover 主题色（两端）",
+            "content": "双OS答案合并判分验证（validate_flag 多答案；flag 域 62 passed）",
             "status": "completed"
           },
           {
-            "content": "体验E2：CH-1043 干扰项示范完成；全库取证类批量治理转 r2 取证真实化统一推进",
+            "content": "单测（动态flag注入/显式路径/双OS启动切换）+ 域回归（20+66 passed）",
             "status": "completed"
           },
           {
-            "content": "体验E3：红线收敛（R 层+表述改写+测试）",
-            "status": "completed"
-          },
-          {
-            "content": "主题三值精确+刷新首帧同步+按钮当前名（两端）",
+            "content": "热更容器 + B-41 真机端到端验证（启靶→快照含 /root/b41-flag.txt→提交 passed）",
             "status": "completed"
           }
         ]
       },
       {
-        "id": "r2",
-        "name": "第一届样题核对+取证题真实化（流量制作）",
+        "id": "s2",
+        "name": "全库容器化缺口清单（用户审核）",
         "status": "completed",
         "todos": [
           {
-            "content": "第一届样题全量核对表",
+            "content": "全库盘点需要环境的题与现有镜像映射（脚本+原题环境/OS明确性分类）",
             "status": "completed"
           },
           {
-            "content": "B14 综合取证大题：素材真实制作+16 题入库（CH-1254~1269 两端）",
+            "content": "输出缺口清单文档（题号/原题环境/OS明确性/现镜像/缺口/建议）",
             "status": "completed"
           },
           {
-            "content": "12 pcap 真实重打全完成（10.0 网段+answers 零变更/谨慎同步+旧件备份）",
-            "status": "completed"
-          },
-          {
-            "content": "产物登记+判分自检（审核通过+DB↔manifest 全量同步+备份）",
-            "status": "completed"
-          },
-          {
-            "content": "全库取证题真实化批量（E2 现象级持续项：CH-1043 示范完成；其余取证素材题逐题丰富干扰=登记后续优化队列）",
+            "content": "交用户审核（阻塞点，审核后才补）",
             "status": "completed"
           }
         ]
       },
       {
-        "id": "p3",
-        "name": "win/win+linux 场景落地",
-        "status": "pending",
+        "id": "s3",
+        "name": "镜像与新题：CentOS7加固+双OS落地+缺口补齐+win中文基线",
+        "status": "completed",
         "todos": [
           {
-            "content": "win 纯场景（dockurr≤2）：关卡/训练形态+利用链装配",
-            "status": "pending"
+            "content": "CentOS7 基础镜像（ISO/registry+腾讯 vault 源）",
+            "status": "completed"
           },
           {
-            "content": "win+linux 混合：拓扑+横向链（跨系统）",
-            "status": "pending"
+            "content": "CentOS7 加固镜像（A 模块9项+D预埋）",
+            "status": "completed"
+          },
+          {
+            "content": "缺口清单 26 个缺失镜像重建 + 动态 flag entrypoint 统一",
+            "status": "completed"
+          },
+          {
+            "content": "双OS题落地 38 道 A verify（审核：76/76 双OS矩阵 + API/UI 实测）",
+            "status": "completed"
+          },
+          {
+            "content": "win 中文基线重装",
+            "status": "completed"
+          },
+          {
+            "content": "win 场景盘中文基线重建（6 盘回归 4720/4698/7045/flag/winlab 110）",
+            "status": "completed"
+          },
+          {
+            "content": "win 21 题中文化（16 处术语中文名+23 张中文基线截图+win 域 153 passed）",
+            "status": "completed"
           }
         ]
       },
       {
-        "id": "p4",
-        "name": "应急场景扩充落地",
-        "status": "pending",
+        "id": "s4",
+        "name": "提示卡/学习卡重做+题干泄底收敛（保可解性）",
+        "status": "completed",
         "todos": [
           {
-            "content": "真实事件剧本：SSH爆破+公钥后门/隐藏持久化/chattr锁/启动项等",
-            "status": "pending"
+            "content": "提示卡重做（HintCard 分级【思路/方法/命令/答案命令】+复制+警示；前端已接入）",
+            "status": "completed"
           },
           {
-            "content": "win 应急（事件日志 4624/4625/4720/7045 等）形态",
-            "status": "pending"
+            "content": "学习卡精炼去长篇（104 张要点化，concept 平均 358→219 字）",
+            "status": "completed"
+          },
+          {
+            "content": "题干泄底 C 类收敛（55 题 manifest+DB 双写；审计核实逐字节一致；可解性校验记录）",
+            "status": "completed"
+          },
+          {
+            "content": "学习卡补缺（审计：仍缺 42 张，已并入 L6 统一推进）",
+            "status": "completed"
           }
         ]
       },
       {
-        "id": "p5",
-        "name": "BOT 重新特化+验证矩阵",
+        "id": "s5",
+        "name": "遗留治理：pcap/winlab/E2/MCP/inc/C模块/BOT速度/杂项",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "房间单开限制+清理（审核通过）",
+            "status": "completed"
+          },
+          {
+            "content": "靶场互斥（审核通过）",
+            "status": "completed"
+          },
+          {
+            "content": "前端导航/返回按钮（审核通过）",
+            "status": "completed"
+          },
+          {
+            "content": "出题规范动态 flag + MCP（审核通过）",
+            "status": "completed"
+          },
+          {
+            "content": "附加前端体验 + 官方主题/已解出/按钮/导航（视觉复核）",
+            "status": "completed"
+          },
+          {
+            "content": "L7/L10/L11测试房（审计：已完成）",
+            "status": "completed"
+          },
+          {
+            "content": "L2 pcap 重打 5 题（30/30 PASS）",
+            "status": "completed"
+          },
+          {
+            "content": "L4 test_pen_drill_real 修复（4 passed×5）",
+            "status": "completed"
+          },
+          {
+            "content": "L5 E2 取证素材（15 题，自检 91/91）",
+            "status": "completed"
+          },
+          {
+            "content": "L6 补卡+MCP 9 条（卡 104 + MCP 9 条）",
+            "status": "completed"
+          },
+          {
+            "content": "target_manager iptables 规则回收修复",
+            "status": "completed"
+          },
+          {
+            "content": "L9 C 模块多机复刻（子agent完成：CH-1280~1289 外站2+内站8，真机 10/10；待抽查）",
+            "status": "completed"
+          },
+          {
+            "content": "L11 M/T 出题权限放行（用户拍板：已实现 M/T 可出/可改，13 passed）",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "name": "验证与服务器：全量pytest全绿+双OS真机+服务器固化同步",
         "status": "in_progress",
         "todos": [
           {
-            "content": "BOT 速度按档位调整（信息驱动+链逐条节流+测试档短间隔接口带管理员 token 已有=验证）",
+            "content": "全量 pytest 全绿（1352 passed/15 skipped EXIT=0；修复 test_analysis_trend M/T 期望）",
+            "status": "completed"
+          },
+          {
+            "content": "双OS真机实证（CH-1026 API/UI 切换 + 38 题 76/76 矩阵）",
+            "status": "completed"
+          },
+          {
+            "content": "本地镜像固化（wangan-arena + 靶镜像 save）",
             "status": "in_progress"
           },
           {
-            "content": "sqli_blind_time 卡补完整外带循环；ssh_reuse 升级第 4 多账号（advanced 40%）",
+            "content": "服务器 103.40.14.100 同步+compose up+实启验证",
             "status": "in_progress"
           },
           {
-            "content": "persist 应急新场景 BOT 特化（inc_bot 知识链）+全自动验证",
-            "status": "pending"
-          },
-          {
-            "content": "验证矩阵：pen 随机局全链实测+应急矩阵+AWD 回归零影响",
-            "status": "pending"
-          }
-        ]
-      },
-      {
-        "id": "p6",
-        "name": "收尾",
-        "status": "pending",
-        "todos": [
-          {
-            "content": "pytest 全子集+DEV-NOTES+备份",
-            "status": "pending"
-          },
-          {
-            "content": "audit",
+            "content": "记忆库更新 + audit 收尾",
             "status": "pending"
           }
         ]
       }
     ],
-    "planFile": "/tmp/plan/ses_02057173affe7wL6M3HElINAFz-1788711499495.md",
+    "planFile": "/tmp/plan/ses_02057173affe7wL6M3HElINAFz-1788871526009.md",
+    "flow": "execute"
+  },
+  "ses_f7cba6e26ffelli34ypjXNcItH": {
+    "goal": "wangan-arena 生产服务器部署（本地→103.40.14.100:36006）+ 实启验证。大任务，长任务后台+日志轮询。步骤：1 本机构建平台镜像；2 rsync 源码；3 靶机镜像 save/load；4 compose up；5 DB 同步 upsert+seed；6 win-storage 同步；7 服务器实启验证（/api/env、双OS、动态flag、L9多机、房间规则、MCP下载）；8 产出部署清单+验证证据+遗留。约束：不远程 build；长任务后台+日志；删除用 del；服务器操作前备份；带宽受限如实报告。",
+    "state": "active",
+    "turns": 1,
+    "maxTurns": 100,
+    "updatedAt": 1788908975013,
+    "startedAt": 1788908771416,
+    "stages": [
+      {
+        "id": "s1",
+        "name": "P1 准备与构建（平台镜像/备份/带宽/save）",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "本机构建 wangan-arena:latest 镜像（Dockerfile.arena，后台日志）",
+            "status": "completed"
+          },
+          {
+            "content": "服务器 pg_dump 备份 + 旧镜像保留策略确认",
+            "status": "completed"
+          },
+          {
+            "content": "带宽测试与传输策略决策（如实报告）",
+            "status": "completed"
+          },
+          {
+            "content": "docker save 31 个镜像到 /tmp/opencode/wa-images.tar",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "name": "P2 源码同步（rsync backend/web/deploy/data-bank/scripts）",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "rsync backend/web/deploy/data/bank/scripts + docker-compose.yml",
+            "status": "completed"
+          },
+          {
+            "content": "单独 rsync backend/.env",
+            "status": "completed"
+          },
+          {
+            "content": "清理服务器 bank 根 manifest.json 残留（mv 备份）",
+            "status": "completed"
+          },
+          {
+            "content": "校验两端 bank 目录数一致（260）",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "name": "P3 靶机镜像 rsync/scp + docker load",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "rsync wa-images.tar 到服务器（--partial 可续传）",
+            "status": "completed"
+          },
+          {
+            "content": "服务器 docker load -i wa-images.tar",
+            "status": "completed"
+          },
+          {
+            "content": "校验 31 个镜像齐全",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "s4",
+        "name": "P4 compose up + DB upsert/seed 同步",
+        "status": "completed",
+        "todos": [
+          {
+            "content": "服务器 docker compose up -d（不远程 build）",
+            "status": "completed"
+          },
+          {
+            "content": "健康检查 /api/env HTTP 200",
+            "status": "completed"
+          },
+          {
+            "content": "编写并执行 manifest→DB upsert 脚本（update+insert 全字段含双OS）",
+            "status": "completed"
+          },
+          {
+            "content": "执行 seed_ch1280_1289.py 幂等入库",
+            "status": "completed"
+          },
+          {
+            "content": "一致性校验：259 行 + CH-128x + 双OS/动态flag/hints/win中文化/E2 素材",
+            "status": "completed"
+          }
+        ]
+      },
+      {
+        "id": "s5",
+        "name": "P5 win-storage 中文基线 + 6 场景盘同步",
+        "status": "in_progress",
+        "todos": [
+          {
+            "content": "服务器旧 base 移开备份（.old）",
+            "status": "pending"
+          },
+          {
+            "content": "rsync 中文基线 win-storage/base/data.qcow2",
+            "status": "pending"
+          },
+          {
+            "content": "rsync win-scenarios 6 盘",
+            "status": "pending"
+          },
+          {
+            "content": "校验 WIN_* 与 /api/win-target/status",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "s6",
+        "name": "P6 服务器实启验证（6 项逐项证据）",
+        "status": "in_progress",
+        "todos": [
+          {
+            "content": "/api/env modules 含 M/T + 200",
+            "status": "completed"
+          },
+          {
+            "content": "双OS：CH-1026 start?os=main→Ubuntu；?os=alt→CentOS7；stop",
+            "status": "completed"
+          },
+          {
+            "content": "动态flag：CH-1071 快照含 /root/b41-flag.txt → 提交 passed；stop",
+            "status": "completed"
+          },
+          {
+            "content": "L9多机：CH-1282 快照含 web2_flag1.txt → 提交 passed；stop",
+            "status": "completed"
+          },
+          {
+            "content": "房间规则：非管理员第2房 400；running 房拒新建/解散",
+            "status": "completed"
+          },
+          {
+            "content": "MCP 下载 GET /api/mcp/client/download → 200 application/zip",
+            "status": "completed"
+          },
+          {
+            "content": "清理自建靶场/房间/测试用户",
+            "status": "completed"
+          },
+          {
+            "content": "win-storage 同步后 win 靶机验证 → docker stop arena-win-shared 释放",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "s7",
+        "name": "P7 产出部署清单/证据/遗留 + 审计",
+        "status": "pending",
+        "todos": [
+          {
+            "content": "汇总部署清单（镜像/文件/DB 行数）",
+            "status": "pending"
+          },
+          {
+            "content": "汇总每项验证证据",
+            "status": "pending"
+          },
+          {
+            "content": "遗留事项登记",
+            "status": "pending"
+          },
+          {
+            "content": "对照完成条件审计 → audit",
+            "status": "pending"
+          }
+        ]
+      }
+    ],
+    "planFile": "/tmp/plan/ses_f7cba6e26ffelli34ypjXNcItH-1788908771416.md",
     "flow": "execute"
   }
 }
