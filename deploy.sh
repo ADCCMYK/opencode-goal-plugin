@@ -115,49 +115,15 @@ if [ -n "$TUI_SRC" ]; then
     echo "    + TUI 插件已在生效位置（.config/opencode/tui-plugin/，跳过复制）"
   fi
   echo "    + TUI 插件: $TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx"
-  # tui.json 注册（不覆盖原则）：
-  #   - 目标不存在 → 从源复制；无源则生成默认引用（保证全新安装 TUI 插件可加载）
-  #   - 目标已存在 → 仅当未引用本插件时追加合并（先备份 .bak），其他插件引用原样保留，绝不全量覆盖
-  TUI_TARGET="$TARGET_HOME/.config/opencode/tui.json"
-  TUI_SRC_JSON=""
-  if [ -f "$SCRIPT_DIR/tui/tui.json" ]; then
-    TUI_SRC_JSON="$SCRIPT_DIR/tui/tui.json"
-  elif [ -f "$SCRIPT_DIR/tui.json" ]; then
-    TUI_SRC_JSON="$SCRIPT_DIR/tui.json"
-  fi
-  if [ -f "$TUI_TARGET" ]; then
-    cp -f "$TUI_TARGET" "$TUI_TARGET.bak"
-    export GOAL_TUI_TARGET="$TUI_TARGET"
-    node <<'NODE'
-const fs = require("fs");
-const f = process.env.GOAL_TUI_TARGET;
-try {
-  const j = JSON.parse(fs.readFileSync(f, "utf8"));
-  const plugin = j && Array.isArray(j.plugin) ? j.plugin : [];
-  if (plugin.some(p => typeof p === "string" && p.includes("goal-config"))) {
-    console.log("    + tui.json 已存在且已引用本插件，跳过");
-    process.exit(0);
-  }
-  if (!j.plugin) j.plugin = [];
-  j.plugin.push("./tui-plugin/goal-config.tsx");
-  fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
-  console.log("    + tui.json 已追加本插件引用（其余引用保留，原文件备份 .bak）");
-} catch (e) {
-  console.log("    WARN: tui.json 解析失败，保留不动，请手动检查: " + e.message);
-}
-NODE
-  else
-    mkdir -p "$(dirname "$TUI_TARGET")"
-    if [ -n "$TUI_SRC_JSON" ]; then
-      cp -f "$TUI_SRC_JSON" "$TUI_TARGET"
-    else
-      cat > "$TUI_TARGET" <<'JSON'
-{
-  "plugin": ["./tui-plugin/goal-config.tsx"]
-}
-JSON
+  # tui.json 仅在源码来自插件目录时部署；回退 .config 时为生效位置，tui.json 由 TUI 面板维护，不覆盖
+  if [ "$TUI_SRC" != "$TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx" ]; then
+    if [ -f "$SCRIPT_DIR/tui/tui.json" ]; then
+      cp -f "$SCRIPT_DIR/tui/tui.json" "$TARGET_HOME/.config/opencode/tui.json"
+      echo "    + tui.json: $TARGET_HOME/.config/opencode/tui.json"
+    elif [ -f "$SCRIPT_DIR/tui.json" ]; then
+      cp -f "$SCRIPT_DIR/tui.json" "$TARGET_HOME/.config/opencode/tui.json"
+      echo "    + tui.json: $TARGET_HOME/.config/opencode/tui.json"
     fi
-    echo "    + tui.json 已创建: $TUI_TARGET"
   fi
 else
   echo "    WARN: 未找到 TUI 插件源码（tui/ 或扁平 goal-config.tsx），跳过 TUI 部署（现有配置不受影响）"
