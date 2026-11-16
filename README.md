@@ -29,9 +29,61 @@
 - **多 Agent 并行**：z-goal 是总规划师，按模块拆分多个子代理并行执行；子代理自动获得子目标（task prompt 一行引导）、完成后主代理批量标记阶段完成
 - **迭代模式**：审计后不删目标，插件推送【迭代继续】指令，AI 迭代优化直到用户满意或达迭代上限（`/goal-iter` 单次开启或全局配置）
 - **审计闭环**：`audit` 提交后推送【二次审计】做最终完成度确认；发现遗漏可自动重设目标继续
-- **健壮的自动化**：子代理卡住自动中止并通知主代理（15 秒级检测）；已完成/失败子代理超期自动清理（仅删已完成/失败，进行中永不误删）；Esc 中断即时转暂停
+- **健壮的自动化**：超时交给官方 V2 内建（provider `headerTimeout`/`chunkTimeout` + 超时重试 3 次），插件**不再自设"卡住检测"**（那是误报来源，2026-10-16 移除）；已完成/失败子代理超期自动清理（仅删已完成/失败，进行中永不误删）；Esc 中断即时转暂停
 - **多进程安全**：多个 opencode 实例/AI 共享同一目标文件（原子写入），各会话目标独立互不串扰
 - **参数兼容模型习惯**：阶段/待办参数同时接受 JSON 数组或 JSON 字符串
+
+---
+
+## V2 适配（opencode 2.x）
+
+> opencode 2.x 是**破坏性变更**：V1 的 `@opencode-ai/plugin` 实现在 V2 **完全不运行**；注册键由 `plugin` 改为 `plugins`，
+> 且只接受**目录/包**（写单文件路径会报 `configured plugin path must be a directory`）。
+> 本插件已按 V2 重写「贴宿主的 API 层」——**V1 主体逻辑（状态机/推送文案/阶段代办/迭代/清理）一字未改**（唯一的主动删减：卡住检测，见「官方超时能力与卡住检测移除」），
+> V1 冻结归档见 `/root/opencode-goal-plugin-v1/`（tar 包见 `~/dsh-local/artifacts/`）。
+
+### 加载契约（实测，务必照做）
+
+| 要点 | 说明 |
+|---|---|
+| 注册形态 | `opencode.jsonc`：`"plugins": [{ "package": "<插件目录>", "options": { … } }]` |
+| 入口解析 | V2 对**目录**只解析 `<目录>/server` 或 `<目录>/index`（TUI 半边解析 `<目录>/tui`），**不读 package.json 的 exports**；解析不到会**静默丢弃**（无日志、无报错） |
+| 因此 | 目录根部必须有转出文件：`server.ts`（→ `src/index.ts`）、`tui.tsx`（→ `src/tui-plugin.tsx`） |
+| 源码形态 | V2 直接加载 `.ts`/`.tsx` 源码（无需打包）；插件目录被 watch，**改文件即热重载**（日志可见 `msg="loading plugin"`） |
+| 校验方法 | `opencode service restart` 后查日志：`msg="loading plugin" id=<目录> entrypoint=file://…/server.ts` |
+
+### V1 → V2 宿主 API 对照（本插件实际用到）
+
+| V1 | V2 |
+|---|---|
+| `Plugin = async ({client}) => hooks` | `Plugin.define({ id, setup(ctx) })` |
+| `hooks.event` | `ctx.event.subscribe({ signal })` |
+| `hooks.tool` + `tool()` | `ctx.tool.transform(e => e.add({ name, input: <JSON Schema>, execute }))` |
+| `client.session.prompt({parts:[{synthetic:true}]})` | `ctx.session.synthetic({ delivery:"queue", resume:true })` —— **合成通道**（非用户通道），回合结束送达；`noReply` ≈ `resume:false` |
+| `client.session.messages()` | `ctx.session.context({ sessionID })`（扁平消息：`m.type` / `m.time.completed` / `m.content[]`） |
+| `client.session.status()`（轮询） | `session.status` 事件维护状态表（server 侧）；CLI 侧 `context.data.session.status(sid)` |
+| `client.session.list()/children()` | server 侧无此接口 → `session.created/deleted/renamed` 事件维护会话表（落盘 `subagents.json`）；CLI 侧 `context.data.session.list()` |
+| `client.session.delete / abort` | `ctx.session.remove / interrupt` |
+| `client.tui.showToast` | server 侧无 toast 通道 → 写 `~/.local/state/goal/notify.jsonl`，CLI 半边读队列弹 toast |
+| TUI：`api.ui.toast / ui.dialog.replace / DialogConfirm·Prompt·Select / slots.register / command.register / keymap.registerLayer / route / state / event.on` | `context.ui.toast.show` / `ui.dialog.{confirm,prompt,select,show}` / `ui.slot` / `ui.keymap.layer`（slash 命令） / `ui.router` / `data.*` |
+
+### 目录结构（V2）
+
+```
+opencode-goal-plugin/
+├── server.ts        # V2 服务端入口（纯转出 src/index.ts）
+├── tui.tsx          # V2 CLI 入口（纯转出 src/tui-plugin.tsx）
+├── src/index.ts     # 服务端插件（V1 主体逻辑 + V2 宿主 API）
+├── src/tui-plugin.tsx      # CLI/TUI 插件（面板/设置/slash 命令 + V2 宿主 API）
+└── deploy.sh / uninstall.sh / package.json / README.md
+```
+
+### 与 V1 的差异（仅此几处）
+
+- **命令主名未改**（`/goal-all`、`/goal-subs`、`/goal-fork`、`/goal-update`、`/goal-config`、`/goal-stop`、`/goal-pause`、`/goal-resume`、`/goal-status`、`/goal-cleanup`、`/goal-clearall` 全部与 V1 相同）；
+  但 V2 会把 `aliases` 渲染成**独立条目**（V1 界面不显示 → 显得多余），故**已去掉别名**（`goal-cfg`/`goal-list`/`goals`/`goal-copy`/`goal-clean` 等不再可用）。
+- **通知（原 toast）**：server 插件在 V2 无 toast 通道 → 写 `~/.local/state/goal/notify.jsonl`，由 CLI 半边读取后弹 toast；**位置由 V2 固定为右上角**（CLI 配置无位置项，不可调）。
+- **诊断开关**：`config.json` 里 `"debugEvents": true` 时，服务端会把事件与推进决策写入 `/tmp/opencode/goal-events.log`（默认关闭，不写盘）。
 
 ---
 
@@ -177,7 +229,6 @@ bash deploy.sh          # 可选：bash deploy.sh [用户名] 指定目标用户
 | `planDir` | `default` | 方案文档目录：`default` = `/tmp/plan`、`workspace` = 项目 `.plan`、自定义绝对路径 |
 | `cleanupDays` | 3 | 已完成/失败子代理自动清理天数 |
 | `maxRetainedSubagents` | 60 | 已完成/失败子代理保留上限（0 = 不限），超出删最旧 |
-| `stuckTimeoutMs` | 900000 | 卡住判定：超过该时长无活动即中止子代理（15 秒级检测） |
 | `iterateMode` | false | 全局迭代模式开关（audit 后进入迭代循环） |
 | `iterateMaxRounds` | 10 | 迭代轮数上限（0 = 无限） |
 | `iterAskMode` | `first` | 迭代方向询问频率：`first` 首轮一次全局生效 / `every` 每轮都问 |
@@ -185,7 +236,8 @@ bash deploy.sh          # 可选：bash deploy.sh [用户名] 指定目标用户
 | `forkPaused` | true | Fork 目标到当前会话后默认暂停（需手动恢复） |
 | `autoApprovePermissions` | true | 目标会话自动批准权限请求（不弹窗），非目标会话自动还原询问 |
 
-> 插件 options（opencode.jsonc 插件条目）提供 `maxTurns` / `stuckTimeoutMs` / `autoAbortSubagent` / `cleanupDays` / `maxRetainedSubagents` 等默认值，运行后以 config.json 为准。
+> 插件 options（opencode.jsonc 插件条目）提供 `maxTurns` / `cleanupDays` / `maxRetainedSubagents` 等默认值，运行后以 config.json 为准。
+> （旧配置里的 `stuckTimeoutMs` / `autoAbortSubagent` 已被忽略——卡住检测已于 2026-10-16 移除，见下节。）
 
 ---
 
@@ -200,7 +252,7 @@ bash deploy.sh          # 可选：bash deploy.sh [用户名] 指定目标用户
 │                                         指令 → 插话推送（去重/限频/挂起  │
 │                                         重试）                          │
 │  · watch goals.json 实时刷新             · goal 工具（AI 侧）            │
-│                                          · 卡住检测 / 子代理清理定时器    │
+│                                          · 子代理清理定时器               │
 └──────────────────────┬──────────────────────────┬───────────────────┘
                        │                          │
         ~/.local/state/goal/goals.json ◄──────────┘（全局共享，原子写入）
@@ -226,7 +278,7 @@ bash deploy.sh          # 可选：bash deploy.sh [用户名] 指定目标用户
 ├─ dist/index.js                构建产物（opencode.jsonc 插件条目引用）
 ├─ deploy.sh / uninstall.sh     部署 / 卸载
 ├─ README.md / LICENSE          文档 / MIT 协议
-└─ package.json                 npm run build = esbuild 打包
+└─ package.json                 npm run check = V2 源码语法检查
 
 ~/.config/opencode/
 ├─ opencode.jsonc               插件注册 + /goal 命令 + 权限（合并注入，用户配置保留）
@@ -240,6 +292,15 @@ bash deploy.sh          # 可选：bash deploy.sh [用户名] 指定目标用户
 ```
 
 ---
+
+## 开发文档
+
+- **[`docs/V2-API-对照.md`](docs/V2-API-对照.md)**：V1→V2 行为对照、安装脚本审计、团队工具三件套，以及
+  **§N 经验总表（暂停 / 提示 / 面板 与"用户中断"判定设计，2026-10-17 实战）**：
+  V2 TUI 六个坑（路由形状 `{type,sessionID}`、`createMemo` 响应式、零 invalidate、`setup` 必须返回 cleanup、
+  `toast.show` 需显式 duration + TUI 侧统一走 `notify.jsonl`、命令需 `palette:true`）、
+  唯一判定 `judgeUserStop` 与自插标记生命周期（置上/消费/作废，零时间窗）、
+  事件表与 reason 枚举（依运行时 schema）、可复用的运行时查证/取证手段、缓存与前缀纪律、三条铁律。
 
 ## License
 

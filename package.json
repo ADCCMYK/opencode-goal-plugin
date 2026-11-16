@@ -3,17 +3,25 @@
   "version": "1.0.0",
   "description": "Qoder /goal 风格目标推进插件：设置目标后每轮自动继续推进直到完成、暂停或达轮数上限",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./src/index.ts",
   "exports": {
-    "./server": {
-      "import": "./dist/index.js"
-    }
+    "./server": "./src/index.ts",
+    "./tui": "./src/tui-plugin.tsx"
   },
   "files": [
-    "dist"
+    "src",
+    "tools",
+    "server.ts",
+    "tui.tsx",
+    "deploy.sh",
+    "uninstall.sh",
+    "backup.sh",
+    "README.md",
+    "LICENSE",
+    "docs"
   ],
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --external:@opencode-ai/plugin --platform=node --format=esm --outfile=dist/index.js"
+    "check": "esbuild src/index.ts --bundle --external:@opencode/plugin --platform=node --format=esm --outfile=/tmp/opencode/check-server.mjs && esbuild tui.tsx --loader:.tsx=tsx --jsx=automatic --jsx-import-source=@opentui/solid --bundle --external:@opencode/plugin --external:solid-js --external:@opentui/solid --platform=node --format=esm --outfile=/tmp/opencode/check-tui.mjs && echo \"V2 源码语法检查通过\""
   },
   "keywords": [
     "opencode",
@@ -22,7 +30,7 @@
     "autonomous"
   ],
   "devDependencies": {
-    "@opencode-ai/plugin": "1.18.15",
+    "@opencode/plugin": "2.0.30",
     "esbuild": "^0.25.0"
   }
 }

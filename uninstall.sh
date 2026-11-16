@@ -128,159 +128,40 @@ if [ -f "$CONFIG" ]; then
   cp "$CONFIG" "$CONFIG.uninstall-backup-$STAMP"
   echo "==> 已备份配置: $CONFIG.uninstall-backup-$STAMP"
   export GOAL_UNINSTALL_CONFIG="$CONFIG"
-  node <<'NODE'
-const fs = require("fs");
-const CONFIG = process.env.GOAL_UNINSTALL_CONFIG;
-
-function parseJSONC(text) {
-  let out = "", inStr = false, esc = false, i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (inStr) {
-      out += ch;
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      i++;
-    } else if (ch === '"') {
-      inStr = true; out += ch; i++;
-    } else if (ch === "/" && text[i + 1] === "/") {
-      while (i < text.length && text[i] !== "\n") i++;
-    } else if (ch === "/" && text[i + 1] === "*") {
-      i += 2;
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
-      i += 2;
-    } else {
-      out += ch; i++;
-    }
-  }
-  out = out.replace(/,\s*([}\]])/g, "$1");
-  return JSON.parse(out);
-}
-function deepEq(a, b) {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
-  const ka = Object.keys(a), kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  return ka.every(k => k in b && deepEq(a[k], b[k]));
-}
-
-let cfg;
-try { cfg = parseJSONC(fs.readFileSync(CONFIG, "utf8")); }
-catch (e) { console.log("    ERROR: 配置不是合法 JSON: " + e.message + "（跳过配置修改，其余卸载继续）"); process.exit(0); }
-let changed = false;
-
-// 0) mcp 段（用户 MCP 服务器配置，含密钥）一律原样保留，仅确认打印
-if (cfg.mcp && typeof cfg.mcp === "object" && Object.keys(cfg.mcp).length > 0) {
-  console.log("    保留 mcp 配置 ×" + Object.keys(cfg.mcp).length + "（MCP 服务器配置与密钥不受影响）");
-}
-
-// 1) plugin：仅移除本插件条目（识别同 deploy：路径含 opencode-goal-plugin 或配置含 maxTurns 键）——其他插件条目一律保留
-if (Array.isArray(cfg.plugin)) {
-  const isGoalEntry = (p) => {
-    if (!Array.isArray(p)) return false;
-    if (String(p[0]).includes("opencode-goal-plugin")) return true;
-    const o = p[1];
-    return !!o && typeof o === "object" && !Array.isArray(o) && ("maxTurns" in o);
-  };
-  const before = cfg.plugin.length;
-  cfg.plugin = cfg.plugin.filter(p => !isGoalEntry(p));
-  if (cfg.plugin.length !== before) {
-    changed = true;
-    console.log("    - 移除本插件条目 ×" + (before - cfg.plugin.length) + "，其余插件条目保留");
-  } else {
-    console.log("    跳过：未找到本插件条目");
-  }
-  if (cfg.plugin.length === 0) delete cfg.plugin;
-}
-
-// 2) command：仅当由本插件注册（agent=z-goal 且 template 以 /goal 开头）才移除
-if (cfg.command && typeof cfg.command === "object") {
-  for (const name of ["goal", "goal-iter"]) {
-    const c = cfg.command[name];
-    if (c && typeof c === "object" && c.agent === "z-goal" && typeof c.template === "string" && c.template.startsWith("/" + name)) {
-      delete cfg.command[name];
-      changed = true;
-      console.log("    - 移除本插件命令 /" + name);
-    }
-  }
-  if (Object.keys(cfg.command).length === 0) delete cfg.command;
-}
-
-// 3) agent.general/explore/scout：仅当整块与插件注入形态完全一致（用户未自定义过）才删除；
-//    含任何自定义内容 → 保留不动并提示（宁保留不误删）
-if (cfg.agent && typeof cfg.agent === "object") {
-  const injected = {
-    general: { mode: "subagent", permission: { question: "deny" } },
-    explore: { mode: "subagent", permission: { question: "deny" }, tools: { goal: true } },
-    scout: { mode: "subagent", permission: { question: "deny" } },
-  };
-  for (const name of ["general", "explore", "scout"]) {
-    const a = cfg.agent[name];
-    if (!a || typeof a !== "object") continue;
-    if (deepEq(a, injected[name])) {
-      delete cfg.agent[name];
-      changed = true;
-      console.log("    - 移除 agent." + name + "（与插件注入形态完全一致）");
-    } else {
-      console.log("    保留 agent." + name + "（含非本插件注入的内容，未改动）");
-    }
-  }
-  if (Object.keys(cfg.agent).length === 0) delete cfg.agent;
-}
-
-// 4) 顶层 permission.question: allow —— 无法确证是否为本插件注入（用户可能自配），保留并提示
-if (cfg.permission && typeof cfg.permission === "object" && cfg.permission.question === "allow") {
-  console.log("    提示：顶层 permission.question=allow 已保留（可能为你的原有配置；如确认为本插件注入，请手动从备份中比对删除）");
-}
-
-if (changed) {
-  fs.writeFileSync(CONFIG, JSON.stringify(cfg, null, 2) + "\n");
-  console.log("    配置已修剪并写回（原文件备份于同目录 .uninstall-backup-*）");
-} else {
-  console.log("    配置无需变更");
-}
-NODE
+  node "$SCRIPT_DIR/tools/opencode-config-prune.cjs"
 else
   echo "==> 跳过配置修剪：配置文件不存在 $CONFIG"
 fi
 
-# ---- 2. 处理 tui.json（可能被其他 TUI 插件共用：仅引用本插件才整体回收，否则只移除本插件项）----
-if [ -f "$TUI_JSON" ]; then
-  export GOAL_UNINSTALL_TUI_JSON="$TUI_JSON"
-  export GOAL_UNINSTALL_STAMP="$STAMP"
-  export GOAL_UNINSTALL_TUI_FLAG="/tmp/opencode/goal-uninstall-tui-$STAMP.flag"
-  : > "$GOAL_UNINSTALL_TUI_FLAG"   # 清空为无标记状态（不用 rm 删除临时文件）
-  node <<'NODE'
-const fs = require("fs");
-const f = process.env.GOAL_UNINSTALL_TUI_JSON;
-let text;
-try { text = fs.readFileSync(f, "utf8"); } catch { process.exit(0); }
-try {
-  const j = JSON.parse(text);
-  if (j && Array.isArray(j.plugin)) {
-    const goalIdx = j.plugin.map((p, i) => typeof p === "string" && p.includes("goal") ? i : -1).filter(i => i >= 0);
-    if (goalIdx.length === 0) { console.log("    跳过：tui.json 未引用本插件"); process.exit(0); }
-    if (goalIdx.length === j.plugin.length) {
-      fs.writeFileSync(process.env.GOAL_UNINSTALL_TUI_FLAG, "RECYCLE_ALL");
-      console.log("    - tui.json 仅引用本插件 → 整体回收");
-      process.exit(0);
-    }
-    fs.copyFileSync(f, f + ".uninstall-backup-" + process.env.GOAL_UNINSTALL_STAMP);
-    j.plugin = j.plugin.filter(p => typeof p !== "string" || !p.includes("goal"));
-    fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
-    console.log("    - tui.json 还引用其他插件：仅移除本插件项并写回（已备份）");
-  } else if (text.includes("goal")) {
-    console.log("    保留 tui.json：非标准结构且含 goal 字样，无法安全自动处理，请手动检查");
-  }
-} catch (e) {
-  console.log("    保留 tui.json：解析失败（" + e.message + "），请手动检查");
-}
-NODE
-  if [ -s "$GOAL_UNINSTALL_TUI_FLAG" ]; then
-    if recycle "$TUI_JSON"; then echo "    ✓ 已删除: tui.json（删除方式见上方行）"; else echo "    WARN: tui.json 删除失败，保留"; fi
+# ---- 2. 处理 tui.json（V1 遗留：V1 的 TUI 注册；可能被其他 TUI 插件共用）----
+#   用独立小工具 tools/jsonc-prune.cjs（不再内联解释器脚本）：摘除本插件项、别人的原样保留；
+#   摘空（键被删）且文件里再无本插件字样 ⇒ 整体回收（recycle 走回收站可恢复，helper 另留 .bak）。
+if [ -f "$TUI_JSON" ] && grep -q "goal-config" "$TUI_JSON" 2>/dev/null; then
+  out=""
+  for k in plugin plugins; do
+    out="$(node "$SCRIPT_DIR/tools/jsonc-prune.cjs" "$TUI_JSON" --array-key "$k" --match "goal-config" --drop-key-if-empty --backup 2>/dev/null || true)"
+    [ -n "$out" ] && break
+  done
+  if [ -n "$out" ]; then
+    echo "    - tui.json 已摘除本插件项（$out；已备份 .bak）"
+    if ! grep -q "goal-config" "$TUI_JSON" 2>/dev/null; then
+      if recycle "$TUI_JSON"; then echo "    ✓ 已删除: tui.json（已无本插件项；走回收站可恢复）"; else echo "    WARN: tui.json 删除失败，保留"; fi
+    fi
+  else
+    echo "    ! tui.json 未能自动处理（结构非预期）→ 保留不动，请手动摘除本插件项: $TUI_JSON"
   fi
-  # 临时标记文件保留在 /tmp/opencode（下次运行自动清空覆盖，无害）
+fi
+
+# ---- 2.5 修剪 cli.json（V2 CLI 半边登记；deploy.sh 写入过 plugins 项）----
+#   用独立小工具 tools/jsonc-prune.cjs（JSON/JSONC 手术交给它，脚本里只调一行）：只摘本插件项，别人的原样保留。
+CLI_JSON="$TARGET_HOME/.config/opencode/cli.json"
+if [ -f "$CLI_JSON" ] && grep -q "opencode-goal-plugin" "$CLI_JSON"; then
+  out="$(node "$SCRIPT_DIR/tools/jsonc-prune.cjs" "$CLI_JSON" --array-key plugins --match "opencode-goal-plugin" --drop-key-if-empty --backup 2>/dev/null || true)"
+  if [ -n "$out" ]; then
+    echo "    - cli.json 已摘除本插件登记（$out；已备份 .bak）"
+  else
+    echo "    ! cli.json 未能自动处理（结构非预期）→ 保留不动，请手动摘除本插件项: $CLI_JSON"
+  fi
 fi
 
 # ---- 3. 回收本插件部署文件（全部走回收站；只删本插件文件，不碰同目录其他插件）----
@@ -299,6 +180,22 @@ do_recycle() {
 
 if [ -f "$TUI_FILE" ]; then
   do_recycle "$TUI_FILE" "本插件 TUI 文件 goal-config.tsx"
+fi
+# V1 遗留（deploy.sh 把 V1 文件改名停用，此处一并回收）：TUI 文件备份 / tui.json 备份 / 自动加载目录残留备份
+if [ -f "$TUI_FILE.v1-backup" ]; then
+  do_recycle "$TUI_FILE.v1-backup" "V1 遗留 TUI 文件备份 goal-config.tsx.v1-backup"
+fi
+if [ -f "$TUI_JSON.v1-backup" ]; then
+  do_recycle "$TUI_JSON.v1-backup" "V1 遗留 tui.json 备份 tui.json.v1-backup"
+fi
+for f in "$TARGET_HOME/.config/opencode/plugin/"*goal*.v1-backup; do
+  [ -e "$f" ] || continue
+  do_recycle "$f" "V1 遗留自动加载目录残留备份 $(basename "$f")"
+done
+# 固定安装目录：仅当它不是脚本自身所在目录（= 我们复制过去的副本）时才回收；用户源码目录永不自动删除
+FIXED_DIR="$TARGET_HOME/opencode-goal-plugin"   # 定义提前到此处：下面的回收判断要用它（此前定义在使用之后 ⇒ 判断恒不成立）
+if [ -d "$FIXED_DIR" ] && [ "$(realpath -m "$FIXED_DIR")" != "$(realpath -m "$SCRIPT_DIR")" ]; then
+  do_recycle "$FIXED_DIR" "固定安装目录（插件副本）$FIXED_DIR"
 fi
 # tui-plugin 目录：仅当删除本插件文件后为空才整体回收（目录内若有其他 TUI 插件文件则保留目录）
 if [ -d "$TUI_PLUGIN_DIR" ] && [ -z "$(find "$TUI_PLUGIN_DIR" -mindepth 1 2>/dev/null | head -1)" ]; then
@@ -328,7 +225,6 @@ echo ""
 echo "==> 卸载完成：删除 $removed 项（有回收命令环境已入回收站可恢复；无回收命令环境为 rm 直接删除）"
 echo "    配置备份: $CONFIG.uninstall-backup-$STAMP"
 echo "    运行数据: $([ "$KEEP_DATA" = false ] && echo '已删除（有回收命令环境可从回收站恢复）' || echo '已保留（--keep-data）')"
-FIXED_DIR="$TARGET_HOME/opencode-goal-plugin"
 if [ "$SCRIPT_DIR" = "$TARGET_HOME" ]; then
   echo "    提示：包解压在 HOME 根，卸载后项目文件（src/ dist/ package.json 等）仍在 $TARGET_HOME，建议手动逐一清理（请勿删除 HOME 本身）"
 elif [ -d "$FIXED_DIR" ] && [ "$(realpath -m "$FIXED_DIR")" = "$(realpath -m "$SCRIPT_DIR")" ]; then

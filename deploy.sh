@@ -2,7 +2,7 @@
 # opencode 目标推进插件 一键部署 + 配置合并脚本
 # 用法：bash deploy.sh [用户名]   （任意目录执行；省略用户=当前用户）
 # 固定安装：服务端插件始终固定安装到目标用户的 ~/opencode-goal-plugin（与解压目录无关，
-#           解压目录仅作安装源；opencode.jsonc 引用固定路径 ~/opencode-goal-plugin/dist/index.js）
+#           解压目录仅作安装源；opencode.jsonc 的 plugins 引用固定**目录** ~/opencode-goal-plugin（V2 只收目录，入口在目录根部 server.*/tui.*））
 # 功能：
 #   1. 固定安装项目文件到 ~/opencode-goal-plugin + 编译 server 插件 + 校验 TUI 插件语法
 #   2. 部署 TUI 插件（goal-config.tsx + tui.json）与 z-goal agent 提示词（z-goal.md）到目标用户
@@ -55,7 +55,9 @@ echo "==> 配置文件: $CONFIG"
 if [ "$(realpath -m "$SRC_DIR")" != "$(realpath -m "$TARGET_PLUGIN_DIR")" ]; then
   echo "==> 固定安装到 $TARGET_PLUGIN_DIR（解压目录仅作安装源）"
   mkdir -p "$TARGET_PLUGIN_DIR"
-  for f in src dist package.json deploy.sh uninstall.sh README.md LICENSE; do
+  # ⚠ 必须包含 V2 根入口 server.ts / tui.tsx：V2 只解析 <目录>/server 与 <目录>/tui，
+  #   漏了就会出现"复制成功但插件不加载"的残废安装（本行曾漏 server.ts/tui.tsx，已被沙箱测试抓到）
+  for f in src tools server.ts tui.tsx package.json deploy.sh uninstall.sh README.md LICENSE docs agents; do
     if [ -e "$SRC_DIR/$f" ]; then
       cp -rf "$SRC_DIR/$f" "$TARGET_PLUGIN_DIR/"
     fi
@@ -66,32 +68,39 @@ else
 fi
 PLUGIN_DIR="$TARGET_PLUGIN_DIR"
 
-# ---- 1. 编译 server 插件 ----
-echo "==> 编译 server 插件"
+# ---- 1. V2 入口自检（V2 直接加载 .ts/.tsx 源码，无需打包；dist/ 仅供 V1 使用）----
+echo "==> 自检 V2 插件入口"
 cd "$PLUGIN_DIR"
-# 容错：src/index.ts 缺失（旧版扁平备份解压结构）→ 跳过编译，使用已有 dist/index.js
 if [ -f "$PLUGIN_DIR/src/index.ts" ]; then
-  npm install --no-audit --no-fund --loglevel=error
-  npm run build
+  echo "    + 服务端实现: src/index.ts（V2 直接加载）"
 else
-  echo "    WARN: 未找到 src/index.ts（扁平解压结构），跳过编译，使用已有 dist/index.js"
+  echo "    WARN: 未找到 src/index.ts（扁平解压结构），V2 服务端将无法加载"
 fi
-DIST="$PLUGIN_DIR/dist/index.js"
-[ -f "$DIST" ] || { echo "ERROR: 编译失败，无 dist/index.js"; exit 1; }
-echo "    构建产物: $DIST"
+if [ -f "$PLUGIN_DIR/src/tui-plugin.tsx" ]; then
+  echo "    + TUI 实现: src/tui-plugin.tsx（V2 直接加载）"
+else
+  echo "    WARN: 未找到 src/tui-plugin.tsx，TUI 半边将不加载"
+fi
+# V2：注册路径是「插件目录」本身（V1 注册的是 dist/index.js；V2 只收目录，且只认目录根部 server.* / tui.*）
+DIST="$PLUGIN_DIR"
+[ -f "$PLUGIN_DIR/server.ts" ] || { echo "ERROR: 缺少 V2 服务端入口 $PLUGIN_DIR/server.ts（V2 只解析 <目录>/server 或 <目录>/index）"; exit 1; }
+[ -f "$PLUGIN_DIR/tui.tsx" ] || echo "    WARN: 缺少 V2 TUI 入口 $PLUGIN_DIR/tui.tsx（TUI 半边不会加载）"
+echo "    插件目录（V2 注册路径）: $DIST"
 
-# ---- 2. 校验 TUI 插件语法 ----
+# ---- 2. 校验 TUI 插件语法（V2：校验插件目录内的 src/tui-plugin.tsx）----
+#   ⚠ 此前校验的是 $TUI_DIR/goal-config.tsx（V1 遗留文件）：语义错（V2 不加载它）+ 一旦该文件缺失/损坏
+#     就会让整个安装中断（沙箱测试实测中断）。V2 应校验真正的 TUI 实现 src/tui-plugin.tsx。
 echo "==> 校验 TUI 插件语法"
-if [ -f "$TUI_DIR/goal-config.tsx" ]; then
-  npx -y esbuild "$TUI_DIR/goal-config.tsx" \
-    --jsx=automatic --jsx-import-source=@opentui/solid \
-    --bundle --external:@opencode-ai/plugin/tui \
+if [ -f "$PLUGIN_DIR/src/tui-plugin.tsx" ]; then
+  npx -y esbuild "$PLUGIN_DIR/src/tui-plugin.tsx" \
+    --loader:.tsx=tsx --jsx=automatic --jsx-import-source=@opentui/solid \
+    --bundle --external:@opencode/plugin --external:@opencode/plugin/tui \
     --external:solid-js --external:@opentui/solid --external:@opentui/solid/jsx-runtime \
     --platform=node --format=esm \
     --outfile=/tmp/opencode/tui-check.mjs
   echo "    TUI OK"
 else
-  echo "    WARN: 未找到 TUI 插件，跳过校验"
+  echo "    WARN: 未找到 $PLUGIN_DIR/src/tui-plugin.tsx，跳过校验"
 fi
 
 # ---- 2.5 回收站工具：优先 del/trash-put/gio trash，都没有则 mv 到临时回收目录（可恢复，不直接删除）----
@@ -120,71 +129,64 @@ fi
 
 # ---- 3. 部署 TUI 插件与 z-goal agent 提示词 ----
 echo "==> 部署 TUI 插件与 agent 提示词"
-# 源文件查找顺序：tui/ 目录 → 插件目录扁平 → 包内 .config（同级/包内，解压未到 ~ 时的部署源）→ 已部署位置
-TUI_SRC=""
-if [ -f "$SCRIPT_DIR/tui/goal-config.tsx" ]; then
-  TUI_SRC="$SCRIPT_DIR/tui/goal-config.tsx"
-elif [ -f "$SCRIPT_DIR/goal-config.tsx" ]; then
-  TUI_SRC="$SCRIPT_DIR/goal-config.tsx"
-elif [ -f "$SCRIPT_DIR/.config/opencode/tui-plugin/goal-config.tsx" ]; then
-  TUI_SRC="$SCRIPT_DIR/.config/opencode/tui-plugin/goal-config.tsx"
-elif [ -f "$SCRIPT_DIR/../.config/opencode/tui-plugin/goal-config.tsx" ]; then
-  TUI_SRC="$SCRIPT_DIR/../.config/opencode/tui-plugin/goal-config.tsx"
-elif [ -f "$TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx" ]; then
-  TUI_SRC="$TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx"
+# ---- V2 不再部署独立的 TUI 插件文件；这里改为「停用 V1 遗留」----
+#   V1 时代：goal-config.tsx 复制到 ~/.config/opencode/tui-plugin/ 生效；
+#   V2 时代：TUI 半边由「插件目录」根部 tui.tsx 提供（并登记在 cli.json），**V2 不读 tui-plugin/ 目录**
+#   （实测：V2 二进制里 "tui-plugin" 命中 0 次）⇒ 该文件是纯 V1 遗留：留着会让人误判"还在用 V1"，
+#   直接删又丢失回退能力 → 处理成「改名为 .v1-backup 保留」，可随时改回（幂等：已改名则跳过）。
+V1_TUI_FILE="$TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx"
+if [ -f "$V1_TUI_FILE" ] && [ ! -f "$V1_TUI_FILE.v1-backup" ]; then
+  mv -f "$V1_TUI_FILE" "$V1_TUI_FILE.v1-backup"
+  echo "    - V1 遗留 TUI 文件已停用（改名保留，可随时改回）: goal-config.tsx → goal-config.tsx.v1-backup"
 fi
-if [ -n "$TUI_SRC" ]; then
-  mkdir -p "$TARGET_HOME/.config/opencode/tui-plugin"
-  # realpath 规范化后比较，避免同一文件（含 .. 路径）被 cp 自身报错
-  TUI_SRC_R="$(realpath -m "$TUI_SRC")"
-  TUI_TARGET_R="$(realpath -m "$TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx")"
-  if [ "$TUI_SRC_R" != "$TUI_TARGET_R" ]; then
-    cp -f "$TUI_SRC_R" "$TUI_TARGET_R"
+# V1 遗留二：~/.config/opencode/tui.json（V1 时代的 TUI 注册，指向刚被停用的 goal-config.tsx）
+#   用独立小工具 tools/jsonc-prune.cjs 摘除本插件项（别人的项原样保留）；非常规结构时退回"仅本插件才停用"判断。
+V1_TUI_JSON="$TARGET_HOME/.config/opencode/tui.json"
+if [ -f "$V1_TUI_JSON" ] && grep -q "goal-config" "$V1_TUI_JSON" 2>/dev/null; then
+  # V1 真机形态是 {"plugin": ["./tui-plugin/goal-config.tsx"]} ⇒ 先试 plugin，再试 plugins
+  # ⚠ 本脚本是 set -e：helper 非 0 退出（结构不符/解析失败）不能让安装中断 ⇒ 一律 `|| true` 兜住
+  out=""
+  for k in plugin plugins; do
+    out="$(node "$SCRIPT_DIR/tools/jsonc-prune.cjs" "$V1_TUI_JSON" --array-key "$k" --match "goal-config" --drop-key-if-empty --backup 2>/dev/null || true)"
+    [ -n "$out" ] && break
+  done
+  if [ -n "$out" ]; then
+    echo "    - V1 遗留 tui.json 已摘除本插件项（$out；已备份 .bak）"
   else
-    echo "    + TUI 插件已在生效位置（.config/opencode/tui-plugin/，跳过复制）"
+    refs_total="$(grep -o '\.tsx\|\.ts\|\.js' "$V1_TUI_JSON" | wc -l | tr -d ' ')"
+    refs_ours="$(grep -o 'goal-config' "$V1_TUI_JSON" | wc -l | tr -d ' ')"
+    if [ "$refs_total" -le "$refs_ours" ]; then
+      mv -f "$V1_TUI_JSON" "$V1_TUI_JSON.v1-backup"
+      echo "    - V1 遗留 tui.json 仅引用本插件 → 已停用（改名保留）: tui.json → tui.json.v1-backup"
+    else
+      echo "    ! V1 遗留 tui.json 还引用其他 TUI 插件 → 保留不动，请手动摘除本插件项: $V1_TUI_JSON"
+    fi
   fi
-  echo "    + TUI 插件: $TARGET_HOME/.config/opencode/tui-plugin/goal-config.tsx"
-  # tui.json 注册（安全原则：绝不全量覆盖用户已有内容）
-  #   已存在且已引用本插件 → 跳过；已存在未引用 → 备份 .bak 后追加本插件引用（其余引用保留）；
-  #   不存在 → 从源复制（tui/tui.json、扁平 tui.json），无源则生成默认引用
-  TUI_JSON_TARGET="$TARGET_HOME/.config/opencode/tui.json"
-  if [ -f "$TUI_JSON_TARGET" ]; then
-    if grep -q "goal-config" "$TUI_JSON_TARGET" 2>/dev/null; then
-      echo "    + tui.json 已引用本插件（跳过）"
-    else
-      cp -f "$TUI_JSON_TARGET" "$TUI_JSON_TARGET.bak"
-      export GOAL_TUI_JSON="$TUI_JSON_TARGET"
-      node <<'NODE'
-const fs = require("fs");
-const f = process.env.GOAL_TUI_JSON;
-try {
-  const j = JSON.parse(fs.readFileSync(f, "utf8"));
-  if (!Array.isArray(j.plugin)) j.plugin = [];
-  if (!j.plugin.some(p => typeof p === "string" && p.includes("goal-config"))) {
-    j.plugin.push("./tui-plugin/goal-config.tsx");
-    fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
-    console.log("    + tui.json 已追加本插件引用（其余引用保留，原文件备份 .bak）");
-  } else {
-    console.log("    + tui.json 已引用本插件（跳过）");
-  }
-} catch (e) {
-  console.log("    WARN: tui.json 解析失败，保留不动，请手动检查: " + e.message);
-}
-NODE
-    fi
+fi
+# V1 遗留三：~/.config/opencode/plugin/ 下本插件的残留（V1 的自动加载目录；V2 只认 plugins 注册，不解析该目录内容）
+for f in "$TARGET_HOME/.config/opencode/plugin/"*goal*; do
+  [ -e "$f" ] || continue
+  mv -f "$f" "$f.v1-backup"
+  echo "    - V1 遗留自动加载目录残留已停用（改名保留）: $(basename "$f") → $(basename "$f").v1-backup"
+done
+# 注：cli.json 登记与「有没有 TUI 源码」无关（此前被耦合在同一 if 里，源码缺失时会漏登记）
+if [ -n "$PLUGIN_DIR" ]; then
+  # V2 终端(CLI)插件登记：**默认不做**。
+  #   为什么默认关：opencode.jsonc 的 plugins（目录形态）**本身就会解析出 server + tui 两半**
+  #   （`<目录>/server`、`<目录>/tui`）⇒ 再往 cli.json 写一条同样的插件目录，可能让 TUI 半边被加载两次
+  #   （用户实测反馈"为什么两个 tui"）。旧装的 cli.json 残留由 uninstall.sh 摘除。
+  #   万一某环境下 TUI 半边确实不加载：`GOAL_REGISTER_CLI_JSON=1 bash deploy.sh` 一键恢复登记。
+  if [ "${GOAL_REGISTER_CLI_JSON:-0}" = "1" ]; then
+    echo "    + cli.json 登记（GOAL_REGISTER_CLI_JSON=1 显式开启）"
+    CLI_JSON_TARGET="$TARGET_HOME/.config/opencode/cli.json"
+    export GOAL_CLI_JSON="$CLI_JSON_TARGET"
+    export GOAL_PLUGIN_DIR_FOR_CLI="$PLUGIN_DIR"
+    node "$SCRIPT_DIR/tools/cli-json-register.cjs"
   else
-    mkdir -p "$(dirname "$TUI_JSON_TARGET")"
-    if [ -f "$SCRIPT_DIR/tui/tui.json" ]; then
-      cp -f "$SCRIPT_DIR/tui/tui.json" "$TUI_JSON_TARGET"
-    elif [ -f "$SCRIPT_DIR/tui.json" ]; then
-      cp -f "$SCRIPT_DIR/tui.json" "$TUI_JSON_TARGET"
-    else
-      printf '{\n  "plugin": ["./tui-plugin/goal-config.tsx"]\n}\n' > "$TUI_JSON_TARGET"
-    fi
-    echo "    + tui.json 已创建: $TUI_JSON_TARGET"
+    echo "    + 跳过 cli.json 登记（默认：opencode.jsonc 的 plugins 已足够解析 server+tui 两半）"
   fi
 else
-  echo "    WARN: 未找到 TUI 插件源码（tui/、扁平 goal-config.tsx 或包内 .config），跳过 TUI 部署（现有配置不受影响）"
+  echo "    WARN: 未取到插件目录（PLUGIN_DIR 为空），跳过 cli.json 登记（现有配置不受影响）"
 fi
 # agent 源查找顺序：agents/ 目录 → 扁平 → 包内 .config（同级/包内）→ 已部署位置
 AGENT_SRC=""
@@ -239,147 +241,7 @@ if [ -f "$GOAL_OLD_DIR_FILE" ]; then
     mv "$GOAL_OLD_DIR_FILE" "$GOAL_OLD_DIR_FILE.bak" 2>/dev/null || true
   fi
 fi
-node <<'NODE'
-const fs = require("fs");
-const CONFIG = process.env.GOAL_CONFIG;
-const DIST = process.env.GOAL_PLUGIN_DIST;
-const OLD_DIR_FILE = process.env.GOAL_OLD_DIR_FILE;
-const nodePath = require("path");
-const recordOldDir = (oldPath) => {
-  if (!OLD_DIR_FILE) return;
-  const dir = nodePath.dirname(nodePath.dirname(oldPath));
-  try { fs.writeFileSync(OLD_DIR_FILE, dir); } catch {}
-};
-
-function parseJSONC(text) {
-  let out = "", inStr = false, esc = false, i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (inStr) {
-      out += ch;
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      i++;
-    } else if (ch === '"') {
-      inStr = true; out += ch; i++;
-    } else if (ch === "/" && text[i + 1] === "/") {
-      while (i < text.length && text[i] !== "\n") i++;
-    } else if (ch === "/" && text[i + 1] === "*") {
-      i += 2;
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
-      i += 2;
-    } else {
-      out += ch; i++;
-    }
-  }
-  out = out.replace(/,\s*([}\]])/g, "$1");
-  return JSON.parse(out);
-}
-
-let cfg;
-try { cfg = parseJSONC(fs.readFileSync(CONFIG, "utf8")); }
-catch (e) { console.error("ERROR: 配置不是合法 JSON: " + e.message); process.exit(1); }
-
-let changed = false;
-
-// plugin 去重：识别 goal 插件条目（路径含插件名 或 配置含 maxTurns 键），
-// 已存在 → 路径不一致时更新为新产物路径；缺失才添加
-if (!Array.isArray(cfg.plugin)) cfg.plugin = [];
-const isGoalEntry = (p) => {
-  if (!Array.isArray(p)) return false;
-  if (String(p[0]).includes("opencode-goal-plugin")) return true;
-  const o = p[1];
-  return !!o && typeof o === "object" && !Array.isArray(o) && ("maxTurns" in o);
-};
-let goalIdx = [];
-cfg.plugin.forEach((p, i) => { if (isGoalEntry(p)) goalIdx.push(i); });
-
-if (goalIdx.length > 0) {
-  const keep = goalIdx[0];
-  const oldPath = cfg.plugin[keep][0];
-  const opts = cfg.plugin[keep][1] && typeof cfg.plugin[keep][1] === "object" && !Array.isArray(cfg.plugin[keep][1])
-    ? cfg.plugin[keep][1] : {};
-  if (!("maxTurns" in opts)) opts.maxTurns = 100;
-  // 新配置项：缺失才补齐默认值（不覆盖用户已设置的值）；默认与当前运行一致（cleanupDays 3 / maxRetained 60）
-  if (!("stuckTimeoutMs" in opts)) opts.stuckTimeoutMs = 600000;
-  if (!("autoAbortSubagent" in opts)) opts.autoAbortSubagent = true;
-  if (!("cleanupDays" in opts)) opts.cleanupDays = 3;
-  if (!("maxRetainedSubagents" in opts)) opts.maxRetainedSubagents = 60;
-  if (oldPath !== DIST) {
-    cfg.plugin[keep] = [DIST, opts];
-    changed = true;
-    console.log("    ~ 更新插件路径: " + oldPath + " → " + DIST);
-    recordOldDir(oldPath);
-  } else {
-    console.log("    已存在插件条目且路径一致，跳过");
-  }
-  for (let k = goalIdx.length - 1; k >= 1; k--) {
-    cfg.plugin.splice(goalIdx[k], 1);
-    changed = true;
-    console.log("    - 移除重复 goal 插件条目");
-  }
-} else {
-  cfg.plugin.push([DIST, { maxTurns: 100, stuckTimeoutMs: 600000, autoAbortSubagent: true, cleanupDays: 3, maxRetainedSubagents: 60 }]);
-  changed = true;
-  console.log("    + 添加插件条目: " + DIST);
-}
-
-// command.goal 去重：已存在则不替换
-if (!cfg.command) cfg.command = {};
-if (!cfg.command.goal) {
-  cfg.command.goal = {
-    template: "/goal $ARGUMENTS",
-    description: "设置目标并持续自主推进直到完成",
-    agent: "z-goal",
-    subtask: false
-  };
-  changed = true;
-  console.log("    + 添加命令 /goal");
-} else {
-  console.log("    已存在命令 /goal，跳过");
-}
-
-// permission.question: allow（缺失才添加）
-if (!cfg.permission) cfg.permission = {};
-if (cfg.permission.question === undefined) {
-  cfg.permission.question = "allow";
-  changed = true;
-  console.log("    + 添加 permission.question: allow");
-}
-
-// 子代理覆盖：禁用提问 + 保持 subagent 模式（缺失才添加）；explore 开放 goal 工具（子代理可设子目标，与主环境形态一致）
-if (!cfg.agent) cfg.agent = {};
-for (const name of ["general", "explore", "scout"]) {
-  const a = cfg.agent[name] = cfg.agent[name] || {};
-  if (a.mode === undefined) {
-    a.mode = "subagent";
-    changed = true;
-    console.log(`    + 添加 agent.${name}.mode: subagent`);
-  }
-  const perm = a.permission = a.permission || {};
-  if (perm.question === undefined) {
-    perm.question = "deny";
-    changed = true;
-    console.log(`    + 添加 agent.${name}.permission.question: deny`);
-  }
-  if (name === "explore") {
-    a.tools = a.tools || {};
-    if (a.tools.goal === undefined) {
-      a.tools.goal = true;
-      changed = true;
-      console.log("    + 添加 agent.explore.tools.goal: true");
-    }
-  }
-}
-
-if (changed) {
-  fs.writeFileSync(CONFIG, JSON.stringify(cfg, null, 2) + "\n");
-  console.log("    配置已更新（原文件备份为 .bak）");
-} else {
-  console.log("    配置无需变更");
-}
-NODE
+  node "$SCRIPT_DIR/tools/opencode-config-merge.cjs"
 
 # ---- 4.5 删除旧插件目录（防止缓存/混淆，用 del 移入回收站）----
 if [ -s "$GOAL_OLD_DIR_FILE" ]; then
@@ -405,7 +267,6 @@ if [ ! -f "$STATE_CFG" ]; then
   "cleanupDays": 3,
   "autoApprovePermissions": false,
   "maxRetainedSubagents": 60,
-  "stuckTimeoutMs": 600000,
   "forkPaused": true,
   "iterateMaxRounds": 10,
   "iterAskMode": "first",
